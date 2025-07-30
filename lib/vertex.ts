@@ -107,7 +107,7 @@ export class VertexAIService {
 
   async generateResponse(request: ChatRequest): Promise<ChatResponse> {
     try {
-      // Use Vertex AI Generative AI API for Gemini models (gemini-2.5-flash doesn't support chat endpoint)
+      // Use Vertex AI Generative AI API for Gemini models
       const url = `https://${this.location}-aiplatform.googleapis.com/v1/projects/${this.projectId}/locations/${this.location}/publishers/google/models/${this.modelId}:generateContent`;
       
       console.log('🔍 Debug - URL:', url);
@@ -152,6 +152,14 @@ export class VertexAIService {
       if (!response.ok) {
         const errorText = await response.text();
         console.log('🔍 Debug - Error Response:', errorText);
+        
+        // If the current model fails, try with gemini-pro as fallback
+        if (this.modelId !== 'gemini-pro' && response.status === 400) {
+          console.log('🔄 Trying fallback to gemini-pro model...');
+          this.modelId = 'gemini-pro';
+          return this.generateResponse(request);
+        }
+        
         throw new Error(`Vertex AI API error: ${response.status} - ${errorText}`);
       }
 
