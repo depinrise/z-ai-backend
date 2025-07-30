@@ -4,6 +4,7 @@ interface ChatRequest {
   prompt: string;
   model?: string;
   temperature?: number;
+  systemPrompt?: string;
 }
 
 interface ChatResponse {
@@ -20,6 +21,7 @@ export class VertexAIService {
   private location: string;
   private defaultModel: string;
   private defaultTemperature: number;
+  private defaultSystemPrompt: string;
   private accessToken: string | null = null;
 
   constructor() {
@@ -27,6 +29,7 @@ export class VertexAIService {
     this.location = process.env.GCP_LOCATION || 'us-central1';
     this.defaultModel = process.env.VERTEX_DEFAULT_MODEL || 'gemini-2.5-flash';
     this.defaultTemperature = parseFloat(process.env.VERTEX_DEFAULT_TEMP || '1.5');
+    this.defaultSystemPrompt = process.env.VERTEX_DEFAULT_SYSTEM_PROMPT || 'Kamu adalah Z AI, asisten AI yang ramah dan membantu. Kamu tidak perlu menyebutkan bahwa kamu adalah model Google atau AI lainnya. Kamu cukup menjadi Z AI yang natural dan friendly.';
 
     if (!this.projectId) {
       throw new Error('GCP_PROJECT_ID environment variable is required');
@@ -43,6 +46,10 @@ export class VertexAIService {
 
   private validateTemperature(temperature: number): boolean {
     return temperature >= 0 && temperature <= 2;
+  }
+
+  private validateSystemPrompt(systemPrompt: string): boolean {
+    return systemPrompt.length > 0 && systemPrompt.length <= 2000;
   }
 
   private getServiceAccountCredentials() {
@@ -141,12 +148,22 @@ export class VertexAIService {
         };
       }
 
+      // Validate and get system prompt
+      const systemPrompt = request.systemPrompt || this.defaultSystemPrompt;
+      if (!this.validateSystemPrompt(systemPrompt)) {
+        return {
+          response: '',
+          error: `Invalid system prompt: must be between 1 and 2000 characters`
+        };
+      }
+
       // Use Vertex AI Generative AI API for Gemini models
       const url = `https://${this.location}-aiplatform.googleapis.com/v1/projects/${this.projectId}/locations/${this.location}/publishers/google/models/${model}:generateContent`;
       
       console.log('🔍 Debug - URL:', url);
       console.log('🔍 Debug - Model:', model);
       console.log('🔍 Debug - Temperature:', temperature);
+      console.log('🔍 Debug - System Prompt:', systemPrompt.substring(0, 100) + (systemPrompt.length > 100 ? '...' : ''));
       
       // For generateContent API, we just need the current prompt
       // The API requires role: "user" in contents array
@@ -156,7 +173,7 @@ export class VertexAIService {
             role: "user",
             parts: [
               {
-                text: `Kamu adalah Z AI, asisten AI yang ramah dan membantu. Kamu tidak perlu menyebutkan bahwa kamu adalah model Google atau AI lainnya. Kamu cukup menjadi Z AI yang natural dan friendly. Sekarang, tolong jawab pertanyaan ini: ${request.prompt}`
+                text: `${systemPrompt}\n\nSekarang, tolong jawab pertanyaan ini: ${request.prompt}`
               }
             ]
           }

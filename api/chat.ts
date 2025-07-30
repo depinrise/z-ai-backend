@@ -38,12 +38,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await runMiddleware(req, res, corsMiddleware);
 
-    const { prompt, model, temperature } = req.body;
+    const { prompt, model, temperature, systemPrompt } = req.body;
 
     // Validate required fields
     if (!prompt || typeof prompt !== 'string') {
       res.status(400).json({ 
-        error: 'Invalid request body. Expected { "prompt": "string", "model"?: "string", "temperature"?: number }' 
+        error: 'Invalid request body. Expected { "prompt": "string", "model"?: "string", "temperature"?: number, "systemPrompt"?: "string" }' 
       });
       return;
     }
@@ -80,17 +80,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // Validate system prompt if provided
+    if (systemPrompt !== undefined) {
+      if (typeof systemPrompt !== 'string') {
+        res.status(400).json({ 
+          error: 'System prompt must be a string' 
+        });
+        return;
+      }
+      
+      if (systemPrompt.trim().length === 0) {
+        res.status(400).json({ 
+          error: 'System prompt cannot be empty' 
+        });
+        return;
+      }
+
+      if (systemPrompt.length > 2000) {
+        res.status(400).json({ 
+          error: 'System prompt must be 2000 characters or less' 
+        });
+        return;
+      }
+    }
+
     console.log('📝 Request received:', {
       prompt: prompt.substring(0, 100) + (prompt.length > 100 ? '...' : ''),
       model: model || 'default',
-      temperature: temperature || 'default'
+      temperature: temperature || 'default',
+      systemPrompt: systemPrompt ? (systemPrompt.substring(0, 50) + (systemPrompt.length > 50 ? '...' : '')) : 'default'
     });
 
     const vertexService = new VertexAIService();
     const result = await vertexService.generateResponse({ 
       prompt, 
       model, 
-      temperature 
+      temperature,
+      systemPrompt
     });
 
     if (result.error) {
