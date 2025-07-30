@@ -114,10 +114,11 @@ export class VertexAIService {
       console.log('🔍 Debug - Model ID:', this.modelId);
       
       // For generateContent API, we just need the current prompt
-      // The API doesn't use role-based messages like the Chat API
+      // The API requires role: "user" in contents array
       const requestBody = {
         contents: [
           {
+            role: "user",
             parts: [
               {
                 text: request.prompt
