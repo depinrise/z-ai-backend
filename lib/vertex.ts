@@ -12,7 +12,7 @@ interface ChatResponse {
 }
 
 // Valid models for Vertex AI
-const VALID_MODELS = ['gemini-1.5-flash', 'gemini-2.5-flash'] as const;
+const VALID_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro'] as const;
 type ValidModel = typeof VALID_MODELS[number];
 
 export class VertexAIService {
@@ -25,7 +25,7 @@ export class VertexAIService {
   constructor() {
     this.projectId = process.env.GCP_PROJECT_ID || '';
     this.location = process.env.GCP_LOCATION || 'us-central1';
-    this.defaultModel = process.env.VERTEX_DEFAULT_MODEL || 'gemini-1.5-flash';
+    this.defaultModel = process.env.VERTEX_DEFAULT_MODEL || 'gemini-2.5-flash';
     this.defaultTemperature = parseFloat(process.env.VERTEX_DEFAULT_TEMP || '1.5');
 
     if (!this.projectId) {
@@ -189,12 +189,12 @@ export class VertexAIService {
         const errorText = await response.text();
         console.log('🔍 Debug - Error Response:', errorText);
         
-        // If the current model fails, try with gemini-1.5-flash as fallback
-        if (model !== 'gemini-1.5-flash' && response.status === 400) {
-          console.log('🔄 Trying fallback to gemini-1.5-flash model...');
+        // If the current model fails, try with gemini-2.5-flash as fallback
+        if (model !== 'gemini-2.5-flash' && response.status === 400) {
+          console.log('🔄 Trying fallback to gemini-2.5-flash model...');
           return this.generateResponse({
             ...request,
-            model: 'gemini-1.5-flash'
+            model: 'gemini-2.5-flash'
           });
         }
         
