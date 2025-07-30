@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 
 interface ChatRequest {
   prompt: string;
+  messages?: Array<{ role: 'user' | 'model'; content: string }>;
 }
 
 interface ChatResponse {
@@ -107,19 +108,20 @@ export class VertexAIService {
 
   async generateResponse(request: ChatRequest): Promise<ChatResponse> {
     try {
-      // Use Vertex AI Generative AI API for Gemini models
-      const url = `https://${this.location}-aiplatform.googleapis.com/v1/projects/${this.projectId}/locations/${this.location}/publishers/google/models/${this.modelId}:generateContent`;
+      // Use Vertex AI Chat API for Gemini models
+      const url = `https://${this.location}-aiplatform.googleapis.com/v1/projects/${this.projectId}/locations/${this.location}/publishers/google/models/${this.modelId}:chat`;
       
+      // Build messages array - start with existing messages or empty array
+      const messages = request.messages || [];
+      
+      // Add the current user prompt
+      messages.push({
+        role: 'user',
+        content: request.prompt
+      });
+
       const requestBody = {
-        contents: [
-          {
-            parts: [
-              {
-                text: request.prompt
-              }
-            ]
-          }
-        ],
+        messages: messages,
         generationConfig: {
           temperature: 1.5,
           maxOutputTokens: 1024,
@@ -176,7 +178,7 @@ export class VertexAIService {
 
   private extractTextFromCandidate(candidate: any): string {
     try {
-      // Handle Gemini Generative AI API response format
+      // Handle Gemini Chat API response format
       if (candidate.content && candidate.content.parts) {
         const parts = candidate.content.parts;
         if (parts.length > 0 && parts[0].text) {
