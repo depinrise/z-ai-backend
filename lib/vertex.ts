@@ -111,26 +111,18 @@ export class VertexAIService {
       // Use Vertex AI Generative AI API for Gemini models (gemini-2.5-flash doesn't support chat endpoint)
       const url = `https://${this.location}-aiplatform.googleapis.com/v1/projects/${this.projectId}/locations/${this.location}/publishers/google/models/${this.modelId}:generateContent`;
       
-      // Build messages array - start with existing messages or empty array
-      const messages = request.messages || [];
-      
-      // Add the current user prompt
-      messages.push({
-        role: 'user',
-        content: request.prompt
-      });
-
-      // Convert messages to contents format for generateContent API
-      const contents = messages.map(message => ({
-        parts: [
-          {
-            text: message.content
-          }
-        ]
-      }));
-
+      // For generateContent API, we just need the current prompt
+      // The API doesn't use role-based messages like the Chat API
       const requestBody = {
-        contents: contents,
+        contents: [
+          {
+            parts: [
+              {
+                text: request.prompt
+              }
+            ]
+          }
+        ],
         generationConfig: {
           temperature: 1.5,
           maxOutputTokens: 1024,
