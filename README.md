@@ -1,189 +1,188 @@
 # Z AI Backend
 
-Backend sederhana untuk chatbot Z AI menggunakan GCP Vertex AI dengan Node.js, Express, dan TypeScript.
+Backend untuk chatbot Z AI menggunakan GCP Vertex AI dengan Gemini models.
 
 ## 🚀 Fitur
 
-- Endpoint `/api/chat` untuk menerima permintaan dari frontend
-- Integrasi dengan GCP Vertex AI (Gemini Pro/Flash)
-- CORS middleware yang dapat dikonfigurasi
-- Support untuk Service Account authentication dengan BASE64 encoding
-- Siap deploy ke Vercel
+- ✅ Integrasi dengan Google Cloud Vertex AI
+- ✅ Support untuk model Gemini (gemini-2.5-flash, gemini-2.5-pro, dll)
+- ✅ Error handling yang robust
+- ✅ Test mode untuk development
+- ✅ Real-time Vertex AI integration
+- ✅ CORS support
+- ✅ TypeScript support
 
 ## 📋 Prerequisites
 
 - Node.js 18+ 
-- GCP Project dengan Vertex AI API enabled
-- GCP Service Account dengan permission untuk Vertex AI
+- Google Cloud Project dengan Vertex AI API enabled
+- Service Account dengan Vertex AI User permissions
 
-## 🛠️ Setup
+## 🔧 Setup
 
 ### 1. Clone Repository
 ```bash
 git clone <repository-url>
 cd z-ai-backend
-```
-
-### 2. Install Dependencies
-```bash
 npm install
 ```
 
-### 3. Environment Variables
+### 2. Setup Credentials
 
-Copy `env.example` ke `.env` dan isi dengan konfigurasi GCP Anda:
-
+#### Cara Otomatis (Recommended)
 ```bash
-cp env.example .env
+npm run setup
 ```
+Script ini akan:
+- Membuat file `.env` dari `env.example`
+- Menampilkan panduan lengkap untuk setup credentials
+- Mengecek status konfigurasi saat ini
 
-#### Required Variables:
-- `GCP_PROJECT_ID`: ID project GCP Anda
-- `GCP_LOCATION`: Lokasi Vertex AI (default: "us-central1")
-- `GCP_MODEL_ID`: Model yang digunakan (default: "gemini-pro")
-- `GCP_SERVICE_ACCOUNT_BASE64`: Service account JSON yang di-encode ke BASE64 (required)
-- `ALLOWED_ORIGIN`: Domain frontend yang diizinkan untuk CORS (default: "https://zverse.my.id")
+#### Cara Manual
+1. Copy `env.example` ke `.env`
+2. Isi environment variables yang diperlukan
 
-### 4. Setup Service Account Credentials
+### 3. Konfigurasi GCP Credentials
 
-#### Cara 1: Menggunakan Script Helper
-```bash
-# Simpan service account JSON ke file (misal: service-account.json)
-node scripts/encode-credentials.js service-account.json
-# Copy output BASE64 string ke environment variable
-```
+#### Langkah-langkah Detail:
 
-#### Cara 2: Manual Encoding
-```bash
-# Encode service account JSON ke BASE64
-cat service-account.json | base64 -w 0
-# Copy output ke GCP_SERVICE_ACCOUNT_BASE64
-```
+1. **Buka Google Cloud Console**
+   - Kunjungi: https://console.cloud.google.com/
+   - Pilih atau buat project baru
 
-### 5. Development
+2. **Enable Vertex AI API**
+   - Buka "APIs & Services" > "Library"
+   - Cari "Vertex AI API"
+   - Klik "Enable"
+
+3. **Buat Service Account**
+   - Buka "IAM & Admin" > "Service Accounts"
+   - Klik "Create Service Account"
+   - Beri nama (contoh: "vertex-ai-service")
+   - Klik "Create and Continue"
+
+4. **Grant Permissions**
+   - Role: "Vertex AI User"
+   - Klik "Continue" dan "Done"
+
+5. **Download JSON Key**
+   - Klik service account yang baru dibuat
+   - Tab "Keys" > "Add Key" > "Create new key"
+   - Pilih "JSON"
+   - Download file JSON
+
+6. **Encode ke Base64**
+   ```bash
+   cat service-account.json | base64 -w 0
+   ```
+
+7. **Update .env**
+   ```env
+   GCP_PROJECT_ID=your-project-id
+   GCP_SERVICE_ACCOUNT_BASE64=eyJ0eXBlIjoic2VydmljZV9hY2NvdW50IiwicHJva...
+   ```
+
+## 🧪 Test Mode vs Production Mode
+
+### Development Mode (NODE_ENV=development)
+- ✅ Menggunakan test mode jika credentials tidak valid
+- ✅ Fallback ke mock responses
+- ✅ Memungkinkan testing tanpa credentials real
+- ✅ Logging yang detail untuk debugging
+
+### Production Mode (NODE_ENV=production)
+- ✅ Memerlukan credentials GCP yang valid
+- ✅ Menggunakan Vertex AI API real-time
+- ✅ Tidak ada fallback ke test mode
+- ✅ Error handling yang strict
+
+## 🚀 Running the Application
+
+### Development
 ```bash
 npm run dev
 ```
 
-### 6. Build & Production
+### Production
 ```bash
 npm run build
 npm start
 ```
 
-## 🌐 API Endpoints
+## 📡 API Endpoints
 
-### POST /api/chat
-
-Menerima request chat dan mengembalikan response dari Vertex AI.
-
-#### Request Body:
-```json
-{
-  "prompt": "Halo, bagaimana kabarmu?"
-}
-```
-
-#### Response:
-```json
-{
-  "success": true,
-  "response": "Halo! Kabar saya baik, terima kasih sudah bertanya. Bagaimana dengan kabar Anda?",
-  "timestamp": "2024-01-15T10:30:00.000Z"
-}
-```
-
-#### Error Response:
-```json
-{
-  "error": "Failed to generate response",
-  "details": "Error message from Vertex AI"
-}
-```
-
-### GET /health
-
-Health check endpoint untuk monitoring.
-
-#### Response:
-```json
-{
-  "status": "OK",
-  "timestamp": "2024-01-15T10:30:00.000Z",
-  "service": "Z AI Backend"
-}
-```
-
-## 🚀 Deployment ke Vercel
-
-1. Push code ke GitHub
-2. Connect repository ke Vercel
-3. Set environment variables di Vercel dashboard
-4. Deploy!
-
-### Environment Variables di Vercel:
-- `GCP_PROJECT_ID`
-- `GCP_LOCATION` 
-- `GCP_MODEL_ID`
-- `GCP_SERVICE_ACCOUNT_BASE64` (paste BASE64 string langsung)
-- `ALLOWED_ORIGIN`
-
-## 📁 Struktur Project
-
-```
-├── api/
-│   └── chat.ts           → Handler utama POST /api/chat
-├── lib/
-│   └── vertex.ts         → Utility untuk Vertex AI
-├── scripts/
-│   └── encode-credentials.js → Helper untuk encode credentials
-├── vercel.json           → Konfigurasi Vercel
-├── tsconfig.json         → Konfigurasi TypeScript
-├── package.json          → Dependencies
-├── env.example           → Contoh environment variables
-├── .gitignore           → Git ignore rules
-└── README.md            → Dokumentasi
-```
-
-## 🔧 Konfigurasi
-
-### Model Options:
-- `gemini-pro`: Model umum purpose
-- `gemini-pro-vision`: Model dengan kemampuan vision
-- `gemini-flash`: Model yang lebih cepat
-
-### Parameters:
-- Temperature: 0.7 (kreativitas)
-- Max Output Tokens: 1024
-- Top P: 0.8
-- Top K: 40
-
-## 🛡️ Security
-
-- CORS dikonfigurasi melalui `ALLOWED_ORIGIN` environment variable
-- Tidak ada autentikasi endpoint (bisa ditambahkan sesuai kebutuhan)
-- Service Account credentials di-encode dalam BASE64 untuk keamanan
-- Environment variables untuk konfigurasi
-
-## 🔑 Setup GCP Service Account
-
-1. Buka Google Cloud Console
-2. Pilih project Anda
-3. Buka "IAM & Admin" > "Service Accounts"
-4. Buat service account baru atau gunakan yang ada
-5. Berikan role "Vertex AI User" atau "Vertex AI Admin"
-6. Buat key baru (JSON format)
-7. Encode JSON ke BASE64 dan set ke `GCP_SERVICE_ACCOUNT_BASE64`
-
-### Contoh Encoding Credentials
-
+### Health Check
 ```bash
-# Menggunakan script helper
-node scripts/encode-credentials.js ./service-account.json
-
-# Atau manual
-cat service-account.json | base64 -w 0
+GET /health
 ```
+
+### Chat API
+```bash
+POST /api/chat
+Content-Type: application/json
+
+{
+  "prompt": "Hello, how are you?",
+  "model": "gemini-2.5-flash",
+  "temperature": 0.7,
+  "systemPrompt": "Custom system prompt (optional)"
+}
+```
+
+## 🔍 Environment Variables
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `GCP_PROJECT_ID` | Google Cloud Project ID | - | ✅ |
+| `GCP_SERVICE_ACCOUNT_BASE64` | Base64 encoded service account JSON | - | ✅ |
+| `GCP_LOCATION` | Vertex AI location | `us-central1` | ❌ |
+| `VERTEX_DEFAULT_MODEL` | Default Gemini model | `gemini-2.5-flash` | ❌ |
+| `VERTEX_DEFAULT_TEMP` | Default temperature | `1.5` | ❌ |
+| `VERTEX_DEFAULT_SYSTEM_PROMPT` | Default system prompt | Custom Z AI prompt | ❌ |
+| `ALLOWED_ORIGIN` | CORS origin | `https://zverse.my.id` | ❌ |
+| `PORT` | Server port | `3000` | ❌ |
+| `NODE_ENV` | Environment mode | `development` | ❌ |
+
+## 🔧 Troubleshooting
+
+### Error: "GCP_PROJECT_ID environment variable is required"
+- Pastikan file `.env` ada dan berisi `GCP_PROJECT_ID` yang valid
+- Jalankan `npm run setup` untuk panduan lengkap
+
+### Error: "Invalid service account credentials"
+- Pastikan `GCP_SERVICE_ACCOUNT_BASE64` berisi Base64 string yang valid
+- Pastikan service account memiliki role "Vertex AI User"
+- Pastikan Vertex AI API sudah enabled
+
+### Error: "Unable to extract response text from Vertex AI response"
+- Sudah diperbaiki dengan error handling yang lebih baik
+- Aplikasi akan menangani `MAX_TOKENS` dan `SAFETY` finish reasons
+- Fallback responses tersedia untuk development mode
+
+### Test Mode Selalu Aktif
+- Pastikan credentials sudah dikonfigurasi dengan benar
+- Cek log untuk melihat status credentials
+- Pastikan tidak menggunakan placeholder values
+
+## 📊 Monitoring & Logging
+
+Aplikasi menyediakan logging yang detail:
+
+- `📝 Request received` - Request yang diterima
+- `🔍 Debug` - Debug information untuk troubleshooting
+- `🚀 Using real Vertex AI` - Menggunakan Vertex AI real-time
+- `✅ Service account credentials validated` - Credentials valid
+- `✅ Access token obtained` - Token berhasil didapat
+- `✅ Vertex AI response received` - Response berhasil diterima
+- `⚠️ Response was cut off` - Response terpotong karena token limit
+- `🧪 Test mode` - Menggunakan test mode
+
+## 🔒 Security
+
+- Service account credentials disimpan sebagai Base64 environment variable
+- CORS dikonfigurasi untuk origin yang spesifik
+- Error messages tidak mengekspos sensitive information
+- Production mode memerlukan valid credentials
 
 ## 📝 License
 

@@ -59,6 +59,11 @@ export class VertexAIService {
     try {
       // Decode BASE64 string to get service account JSON
       const base64Credentials = process.env.GCP_SERVICE_ACCOUNT_BASE64!;
+      
+      if (!base64Credentials || base64Credentials === 'eyJ0eXBlIjoic2VydmljZV9hY2NvdW50IiwicHJva...') {
+        throw new Error('Invalid or placeholder service account credentials');
+      }
+      
       const decodedCredentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
       const serviceAccount = JSON.parse(decodedCredentials);
       
@@ -67,6 +72,7 @@ export class VertexAIService {
         throw new Error('Invalid service account credentials: missing client_email or private_key');
       }
       
+      console.log('✅ Service account credentials validated successfully');
       return serviceAccount;
     } catch (error) {
       if (error instanceof SyntaxError) {
@@ -168,13 +174,25 @@ export class VertexAIService {
       console.log('🔍 Debug - Temperature:', temperature);
       console.log('🔍 Debug - System Prompt:', systemPrompt.substring(0, 100) + (systemPrompt.length > 100 ? '...' : ''));
       
-      // Test mode: return mock response when credentials are missing
-      if (process.env.NODE_ENV !== 'production' && (!this.projectId || !process.env.GCP_SERVICE_ACCOUNT_BASE64)) {
-        console.log('🧪 Test mode: returning mock response');
+      // Check if we have valid credentials for real Vertex AI usage
+      const hasValidCredentials = this.projectId && 
+                                 process.env.GCP_SERVICE_ACCOUNT_BASE64 && 
+                                 process.env.GCP_SERVICE_ACCOUNT_BASE64 !== 'eyJ0eXBlIjoic2VydmljZV9hY2NvdW50IiwicHJva...';
+
+      // Test mode: return mock response when credentials are missing in development
+      if (process.env.NODE_ENV !== 'production' && !hasValidCredentials) {
+        console.log('🧪 Test mode: returning mock response (no valid credentials)');
         return {
           response: `[TEST MODE] Ini adalah respons simulasi untuk: "${request.prompt}"\n\nKode Python untuk kalkulator sederhana:\n\n\`\`\`python\ndef calculator():\n    print("Kalkulator Sederhana")\n    print("1. Penjumlahan")\n    print("2. Pengurangan")\n    print("3. Perkalian")\n    print("4. Pembagian")\n    \n    choice = input("Pilih operasi (1-4): ")\n    num1 = float(input("Masukkan angka pertama: "))\n    num2 = float(input("Masukkan angka kedua: "))\n    \n    if choice == '1':\n        print(f"{num1} + {num2} = {num1 + num2}")\n    elif choice == '2':\n        print(f"{num1} - {num2} = {num1 - num2}")\n    elif choice == '3':\n        print(f"{num1} * {num2} = {num1 * num2}")\n    elif choice == '4':\n        if num2 != 0:\n            print(f"{num1} / {num2} = {num1 / num2}")\n        else:\n            print("Error: Pembagian dengan nol!")\n    else:\n        print("Pilihan tidak valid!")\n\nif __name__ == "__main__":\n    calculator()\n\`\`\``
         };
       }
+
+      // Production mode or development with valid credentials - use real Vertex AI
+      if (process.env.NODE_ENV === 'production' && !hasValidCredentials) {
+        throw new Error('Valid GCP credentials are required in production mode');
+      }
+
+      console.log('🚀 Using real Vertex AI with credentials');
       
       // For generateContent API, we can use system instruction for better token efficiency
       const requestBody = {
@@ -206,7 +224,21 @@ export class VertexAIService {
       console.log('🔍 Debug - Request Body:', JSON.stringify(requestBody, null, 2));
 
       // Get access token
-      const accessToken = await this.getAccessToken();
+      let accessToken: string;
+      try {
+        accessToken = await this.getAccessToken();
+        console.log('✅ Access token obtained successfully');
+      } catch (error) {
+        console.error('❌ Failed to get access token:', error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('🔄 Falling back to test mode due to credential error');
+          return {
+            response: `[TEST MODE - Credential Error] Ini adalah respons simulasi untuk: "${request.prompt}"\n\nError: ${error instanceof Error ? error.message : 'Unknown credential error'}\n\nKode Python untuk kalkulator sederhana:\n\n\`\`\`python\ndef calculator():\n    print("Kalkulator Sederhana")\n    print("1. Penjumlahan")\n    print("2. Pengurangan")\n    print("3. Perkalian")\n    print("4. Pembagian")\n    \n    choice = input("Pilih operasi (1-4): ")\n    num1 = float(input("Masukkan angka pertama: "))\n    num2 = float(input("Masukkan angka kedua: "))\n    \n    if choice == '1':\n        print(f"{num1} + {num2} = {num1 + num2}")\n    elif choice == '2':\n        print(f"{num1} - {num2} = {num1 - num2}")\n    elif choice == '3':\n        print(f"{num1} * {num2} = {num1 * num2}")\n    elif choice == '4':\n        if num2 != 0:\n            print(f"{num1} / {num2} = {num1 / num2}")\n        else:\n            print("Error: Pembagian dengan nol!")\n    else:\n        print("Pilihan tidak valid!")\n\nif __name__ == "__main__":\n    calculator()\n\`\`\``
+          };
+        } else {
+          throw error;
+        }
+      }
 
       const response = await fetch(url, {
         method: 'POST',
@@ -243,6 +275,8 @@ export class VertexAIService {
       }
 
       const candidate = data.candidates[0];
+      console.log('✅ Vertex AI response received successfully');
+      console.log('🔍 Debug - Finish Reason:', candidate.finishReason);
       
       // Check if response was cut off due to token limits
       if (candidate.finishReason === 'MAX_TOKENS') {
