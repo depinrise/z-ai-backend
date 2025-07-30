@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Development files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build outputs (Vercel will build itself)
+dist/
+build/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Test files
+**/*.test.ts
+**/*.spec.ts
+coverage/
+
+# Documentation
+README.md
+DEPLOYMENT.md
+env.example
+
+# Scripts (not needed in production)
+scripts/
+examples/
+
+# Git
+.git/
+.gitignore 
