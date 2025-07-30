@@ -31,12 +31,15 @@ export class VertexAIService {
     this.defaultTemperature = parseFloat(process.env.VERTEX_DEFAULT_TEMP || '1.5');
     this.defaultSystemPrompt = process.env.VERTEX_DEFAULT_SYSTEM_PROMPT || 'Kamu adalah Z AI, asisten AI yang ramah dan membantu. Kamu tidak perlu menyebutkan bahwa kamu adalah model Google atau AI lainnya. Kamu cukup menjadi Z AI yang natural dan friendly.';
 
-    if (!this.projectId) {
-      throw new Error('GCP_PROJECT_ID environment variable is required');
-    }
+    // For testing purposes, allow missing credentials in development
+    if (process.env.NODE_ENV === 'production') {
+      if (!this.projectId) {
+        throw new Error('GCP_PROJECT_ID environment variable is required');
+      }
 
-    if (!process.env.GCP_SERVICE_ACCOUNT_BASE64) {
-      throw new Error('GCP_SERVICE_ACCOUNT_BASE64 environment variable is required');
+      if (!process.env.GCP_SERVICE_ACCOUNT_BASE64) {
+        throw new Error('GCP_SERVICE_ACCOUNT_BASE64 environment variable is required');
+      }
     }
   }
 
@@ -165,22 +168,36 @@ export class VertexAIService {
       console.log('🔍 Debug - Temperature:', temperature);
       console.log('🔍 Debug - System Prompt:', systemPrompt.substring(0, 100) + (systemPrompt.length > 100 ? '...' : ''));
       
-      // For generateContent API, we just need the current prompt
-      // The API requires role: "user" in contents array
+      // Test mode: return mock response when credentials are missing
+      if (process.env.NODE_ENV !== 'production' && (!this.projectId || !process.env.GCP_SERVICE_ACCOUNT_BASE64)) {
+        console.log('🧪 Test mode: returning mock response');
+        return {
+          response: `[TEST MODE] Ini adalah respons simulasi untuk: "${request.prompt}"\n\nKode Python untuk kalkulator sederhana:\n\n\`\`\`python\ndef calculator():\n    print("Kalkulator Sederhana")\n    print("1. Penjumlahan")\n    print("2. Pengurangan")\n    print("3. Perkalian")\n    print("4. Pembagian")\n    \n    choice = input("Pilih operasi (1-4): ")\n    num1 = float(input("Masukkan angka pertama: "))\n    num2 = float(input("Masukkan angka kedua: "))\n    \n    if choice == '1':\n        print(f"{num1} + {num2} = {num1 + num2}")\n    elif choice == '2':\n        print(f"{num1} - {num2} = {num1 - num2}")\n    elif choice == '3':\n        print(f"{num1} * {num2} = {num1 * num2}")\n    elif choice == '4':\n        if num2 != 0:\n            print(f"{num1} / {num2} = {num1 / num2}")\n        else:\n            print("Error: Pembagian dengan nol!")\n    else:\n        print("Pilihan tidak valid!")\n\nif __name__ == "__main__":\n    calculator()\n\`\`\``
+        };
+      }
+      
+      // For generateContent API, we can use system instruction for better token efficiency
       const requestBody = {
         contents: [
           {
             role: "user",
             parts: [
               {
-                text: `${systemPrompt}\n\nSekarang, tolong jawab pertanyaan ini: ${request.prompt}`
+                text: request.prompt
               }
             ]
           }
         ],
+        systemInstruction: {
+          parts: [
+            {
+              text: systemPrompt
+            }
+          ]
+        },
         generationConfig: {
           temperature: temperature,
-          maxOutputTokens: 1024,
+          maxOutputTokens: 4096,
           topP: 0.8,
           topK: 40,
         },
@@ -226,12 +243,39 @@ export class VertexAIService {
       }
 
       const candidate = data.candidates[0];
+      
+      // Check if response was cut off due to token limits
+      if (candidate.finishReason === 'MAX_TOKENS') {
+        console.log('⚠️ Response was cut off due to token limits');
+        // Try to extract any partial response
+        const partialResponse = this.extractTextFromCandidate(candidate);
+        if (partialResponse) {
+          return {
+            response: partialResponse + '\n\n[Response was cut off due to length. Please try a shorter request.]'
+          };
+        } else {
+          return {
+            response: 'Maaf, respons terlalu panjang dan terpotong. Silakan coba dengan pertanyaan yang lebih singkat.',
+            error: 'Response exceeded token limit'
+          };
+        }
+      }
+
+      // Check for other finish reasons
+      if (candidate.finishReason === 'SAFETY') {
+        return {
+          response: 'Maaf, respons tidak dapat diberikan karena alasan keamanan.',
+          error: 'Response blocked by safety filters'
+        };
+      }
+
       let responseText = '';
 
       // Extract text from candidate
       responseText = this.extractTextFromCandidate(candidate);
 
       if (!responseText) {
+        console.log('🔍 Debug - Candidate structure:', JSON.stringify(candidate, null, 2));
         throw new Error('Unable to extract response text from Vertex AI response');
       }
 
@@ -250,12 +294,19 @@ export class VertexAIService {
 
   private extractTextFromCandidate(candidate: any): string {
     try {
+      console.log('🔍 Debug - Extracting text from candidate:', JSON.stringify(candidate, null, 2));
+      
       // Handle Gemini Chat API response format
       if (candidate.content && candidate.content.parts) {
         const parts = candidate.content.parts;
         if (parts.length > 0 && parts[0].text) {
           return parts[0].text;
         }
+      }
+
+      // Handle case where content exists but no parts
+      if (candidate.content && typeof candidate.content === 'string') {
+        return candidate.content;
       }
 
       // Fallback: try to extract from different possible structures
@@ -273,6 +324,11 @@ export class VertexAIService {
       // If it's a string
       if (typeof candidate === 'string') {
         return candidate;
+      }
+
+      // If content exists but is empty or malformed
+      if (candidate.content) {
+        console.log('🔍 Debug - Content exists but no text found:', candidate.content);
       }
 
       return '';
