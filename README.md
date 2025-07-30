@@ -7,7 +7,7 @@ Backend sederhana untuk chatbot Z AI menggunakan GCP Vertex AI dengan Node.js, E
 - Endpoint `/api/chat` untuk menerima permintaan dari frontend
 - Integrasi dengan GCP Vertex AI (Gemini Pro/Flash)
 - CORS middleware yang dapat dikonfigurasi
-- Support untuk Service Account authentication
+- Support untuk Service Account authentication dengan BASE64 encoding
 - Siap deploy ke Vercel
 
 ## 📋 Prerequisites
@@ -41,15 +41,31 @@ cp env.example .env
 - `GCP_PROJECT_ID`: ID project GCP Anda
 - `GCP_LOCATION`: Lokasi Vertex AI (default: "us-central1")
 - `GCP_MODEL_ID`: Model yang digunakan (default: "gemini-pro")
-- `GCP_SERVICE_ACCOUNT_JSON`: JSON credentials service account (required)
+- `GCP_SERVICE_ACCOUNT_BASE64`: Service account JSON yang di-encode ke BASE64 (required)
 - `ALLOWED_ORIGIN`: Domain frontend yang diizinkan untuk CORS (default: "https://zverse.my.id")
 
-### 4. Development
+### 4. Setup Service Account Credentials
+
+#### Cara 1: Menggunakan Script Helper
+```bash
+# Simpan service account JSON ke file (misal: service-account.json)
+node scripts/encode-credentials.js service-account.json
+# Copy output BASE64 string ke environment variable
+```
+
+#### Cara 2: Manual Encoding
+```bash
+# Encode service account JSON ke BASE64
+cat service-account.json | base64 -w 0
+# Copy output ke GCP_SERVICE_ACCOUNT_BASE64
+```
+
+### 5. Development
 ```bash
 npm run dev
 ```
 
-### 5. Build & Production
+### 6. Build & Production
 ```bash
 npm run build
 npm start
@@ -109,7 +125,7 @@ Health check endpoint untuk monitoring.
 - `GCP_PROJECT_ID`
 - `GCP_LOCATION` 
 - `GCP_MODEL_ID`
-- `GCP_SERVICE_ACCOUNT_JSON` (paste JSON credentials langsung)
+- `GCP_SERVICE_ACCOUNT_BASE64` (paste BASE64 string langsung)
 - `ALLOWED_ORIGIN`
 
 ## 📁 Struktur Project
@@ -119,6 +135,8 @@ Health check endpoint untuk monitoring.
 │   └── chat.ts           → Handler utama POST /api/chat
 ├── lib/
 │   └── vertex.ts         → Utility untuk Vertex AI
+├── scripts/
+│   └── encode-credentials.js → Helper untuk encode credentials
 ├── vercel.json           → Konfigurasi Vercel
 ├── tsconfig.json         → Konfigurasi TypeScript
 ├── package.json          → Dependencies
@@ -144,7 +162,7 @@ Health check endpoint untuk monitoring.
 
 - CORS dikonfigurasi melalui `ALLOWED_ORIGIN` environment variable
 - Tidak ada autentikasi endpoint (bisa ditambahkan sesuai kebutuhan)
-- Service Account JSON untuk credentials sensitif
+- Service Account credentials di-encode dalam BASE64 untuk keamanan
 - Environment variables untuk konfigurasi
 
 ## 🔑 Setup GCP Service Account
@@ -155,7 +173,17 @@ Health check endpoint untuk monitoring.
 4. Buat service account baru atau gunakan yang ada
 5. Berikan role "Vertex AI User" atau "Vertex AI Admin"
 6. Buat key baru (JSON format)
-7. Copy isi JSON ke environment variable `GCP_SERVICE_ACCOUNT_JSON`
+7. Encode JSON ke BASE64 dan set ke `GCP_SERVICE_ACCOUNT_BASE64`
+
+### Contoh Encoding Credentials
+
+```bash
+# Menggunakan script helper
+node scripts/encode-credentials.js ./service-account.json
+
+# Atau manual
+cat service-account.json | base64 -w 0
+```
 
 ## 📝 License
 

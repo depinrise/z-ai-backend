@@ -40,4 +40,9 @@ pids/
 coverage/
 
 # Vercel
-.vercel 
+.vercel
+
+# Service account files
+*-service-account.json
+service-account*.json
+credentials.json 

@@ -24,8 +24,29 @@ export class VertexAIService {
       throw new Error('GCP_PROJECT_ID environment variable is required');
     }
 
-    if (!process.env.GCP_SERVICE_ACCOUNT_JSON) {
-      throw new Error('GCP_SERVICE_ACCOUNT_JSON environment variable is required');
+    if (!process.env.GCP_SERVICE_ACCOUNT_BASE64) {
+      throw new Error('GCP_SERVICE_ACCOUNT_BASE64 environment variable is required');
+    }
+  }
+
+  private getServiceAccountCredentials() {
+    try {
+      // Decode BASE64 string to get service account JSON
+      const base64Credentials = process.env.GCP_SERVICE_ACCOUNT_BASE64!;
+      const decodedCredentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
+      const serviceAccount = JSON.parse(decodedCredentials);
+      
+      // Validate required fields
+      if (!serviceAccount.client_email || !serviceAccount.private_key) {
+        throw new Error('Invalid service account credentials: missing client_email or private_key');
+      }
+      
+      return serviceAccount;
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new Error('Invalid JSON in GCP_SERVICE_ACCOUNT_BASE64: ' + error.message);
+      }
+      throw new Error('Failed to decode GCP_SERVICE_ACCOUNT_BASE64: ' + error);
     }
   }
 
@@ -35,7 +56,7 @@ export class VertexAIService {
     }
 
     try {
-      const serviceAccount = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_JSON!);
+      const serviceAccount = this.getServiceAccountCredentials();
       
       const now = Math.floor(Date.now() / 1000);
       const payload = {
@@ -67,14 +88,15 @@ export class VertexAIService {
       });
 
       if (!tokenResponse.ok) {
-        throw new Error(`Failed to get access token: ${tokenResponse.status}`);
+        const errorText = await tokenResponse.text();
+        throw new Error(`Failed to get access token: ${tokenResponse.status} - ${errorText}`);
       }
 
       const tokenData = await tokenResponse.json();
       this.accessToken = tokenData.access_token;
       
       if (!this.accessToken) {
-        throw new Error('No access token received');
+        throw new Error('No access token received from Google OAuth');
       }
       
       return this.accessToken;
