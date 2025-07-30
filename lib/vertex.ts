@@ -2,7 +2,6 @@ import jwt from 'jsonwebtoken';
 
 interface ChatRequest {
   prompt: string;
-  messages?: Array<{ role: 'user' | 'model'; content: string }>;
 }
 
 interface ChatResponse {
@@ -111,6 +110,9 @@ export class VertexAIService {
       // Use Vertex AI Generative AI API for Gemini models (gemini-2.5-flash doesn't support chat endpoint)
       const url = `https://${this.location}-aiplatform.googleapis.com/v1/projects/${this.projectId}/locations/${this.location}/publishers/google/models/${this.modelId}:generateContent`;
       
+      console.log('🔍 Debug - URL:', url);
+      console.log('🔍 Debug - Model ID:', this.modelId);
+      
       // For generateContent API, we just need the current prompt
       // The API doesn't use role-based messages like the Chat API
       const requestBody = {
@@ -131,6 +133,8 @@ export class VertexAIService {
         },
       };
 
+      console.log('🔍 Debug - Request Body:', JSON.stringify(requestBody, null, 2));
+
       // Get access token
       const accessToken = await this.getAccessToken();
 
@@ -143,12 +147,16 @@ export class VertexAIService {
         body: JSON.stringify(requestBody),
       });
 
+      console.log('🔍 Debug - Response Status:', response.status);
+
       if (!response.ok) {
         const errorText = await response.text();
+        console.log('🔍 Debug - Error Response:', errorText);
         throw new Error(`Vertex AI API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('🔍 Debug - Success Response:', JSON.stringify(data, null, 2));
       
       if (!data.candidates || data.candidates.length === 0) {
         throw new Error('No candidates returned from Vertex AI');
