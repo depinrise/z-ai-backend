@@ -2,6 +2,8 @@ import jwt from 'jsonwebtoken';
 
 interface ChatRequest {
   prompt: string;
+  model?: string;
+  temperature?: number;
 }
 
 interface ChatResponse {
@@ -9,16 +11,22 @@ interface ChatResponse {
   error?: string;
 }
 
+// Valid models for Vertex AI
+const VALID_MODELS = ['gemini-1.5-pro', 'gemini-2.5-flash'] as const;
+type ValidModel = typeof VALID_MODELS[number];
+
 export class VertexAIService {
   private projectId: string;
   private location: string;
-  private modelId: string;
+  private defaultModel: string;
+  private defaultTemperature: number;
   private accessToken: string | null = null;
 
   constructor() {
     this.projectId = process.env.GCP_PROJECT_ID || '';
     this.location = process.env.GCP_LOCATION || 'us-central1';
-    this.modelId = process.env.GCP_MODEL_ID || 'gemini-1.5-flash';
+    this.defaultModel = process.env.VERTEX_DEFAULT_MODEL || 'gemini-1.5-pro';
+    this.defaultTemperature = parseFloat(process.env.VERTEX_DEFAULT_TEMP || '1.5');
 
     if (!this.projectId) {
       throw new Error('GCP_PROJECT_ID environment variable is required');
@@ -27,6 +35,14 @@ export class VertexAIService {
     if (!process.env.GCP_SERVICE_ACCOUNT_BASE64) {
       throw new Error('GCP_SERVICE_ACCOUNT_BASE64 environment variable is required');
     }
+  }
+
+  private validateModel(model: string): model is ValidModel {
+    return VALID_MODELS.includes(model as ValidModel);
+  }
+
+  private validateTemperature(temperature: number): boolean {
+    return temperature >= 0 && temperature <= 2;
   }
 
   private getServiceAccountCredentials() {
@@ -107,11 +123,30 @@ export class VertexAIService {
 
   async generateResponse(request: ChatRequest): Promise<ChatResponse> {
     try {
+      // Validate and get model
+      const model = request.model || this.defaultModel;
+      if (!this.validateModel(model)) {
+        return {
+          response: '',
+          error: `Invalid model: ${model}. Valid models are: ${VALID_MODELS.join(', ')}`
+        };
+      }
+
+      // Validate and get temperature
+      const temperature = request.temperature ?? this.defaultTemperature;
+      if (!this.validateTemperature(temperature)) {
+        return {
+          response: '',
+          error: `Invalid temperature: ${temperature}. Temperature must be between 0 and 2`
+        };
+      }
+
       // Use Vertex AI Generative AI API for Gemini models
-      const url = `https://${this.location}-aiplatform.googleapis.com/v1/projects/${this.projectId}/locations/${this.location}/publishers/google/models/${this.modelId}:generateContent`;
+      const url = `https://${this.location}-aiplatform.googleapis.com/v1/projects/${this.projectId}/locations/${this.location}/publishers/google/models/${model}:generateContent`;
       
       console.log('🔍 Debug - URL:', url);
-      console.log('🔍 Debug - Model ID:', this.modelId);
+      console.log('🔍 Debug - Model:', model);
+      console.log('🔍 Debug - Temperature:', temperature);
       
       // For generateContent API, we just need the current prompt
       // The API requires role: "user" in contents array
@@ -127,7 +162,7 @@ export class VertexAIService {
           }
         ],
         generationConfig: {
-          temperature: 1.5,
+          temperature: temperature,
           maxOutputTokens: 1024,
           topP: 0.8,
           topK: 40,
@@ -154,11 +189,13 @@ export class VertexAIService {
         const errorText = await response.text();
         console.log('🔍 Debug - Error Response:', errorText);
         
-        // If the current model fails, try with gemini-pro as fallback
-        if (this.modelId !== 'gemini-pro' && response.status === 400) {
-          console.log('🔄 Trying fallback to gemini-pro model...');
-          this.modelId = 'gemini-pro';
-          return this.generateResponse(request);
+        // If the current model fails, try with gemini-1.5-pro as fallback
+        if (model !== 'gemini-1.5-pro' && response.status === 400) {
+          console.log('🔄 Trying fallback to gemini-1.5-pro model...');
+          return this.generateResponse({
+            ...request,
+            model: 'gemini-1.5-pro'
+          });
         }
         
         throw new Error(`Vertex AI API error: ${response.status} - ${errorText}`);

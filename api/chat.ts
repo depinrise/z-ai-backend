@@ -38,11 +38,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await runMiddleware(req, res, corsMiddleware);
 
-    const { prompt } = req.body;
+    const { prompt, model, temperature } = req.body;
 
+    // Validate required fields
     if (!prompt || typeof prompt !== 'string') {
       res.status(400).json({ 
-        error: 'Invalid request body. Expected { "prompt": "string" }' 
+        error: 'Invalid request body. Expected { "prompt": "string", "model"?: "string", "temperature"?: number }' 
       });
       return;
     }
@@ -54,8 +55,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
+    // Validate model if provided
+    if (model !== undefined && typeof model !== 'string') {
+      res.status(400).json({ 
+        error: 'Model must be a string' 
+      });
+      return;
+    }
+
+    // Validate temperature if provided
+    if (temperature !== undefined) {
+      if (typeof temperature !== 'number') {
+        res.status(400).json({ 
+          error: 'Temperature must be a number' 
+        });
+        return;
+      }
+      
+      if (temperature < 0 || temperature > 2) {
+        res.status(400).json({ 
+          error: 'Temperature must be between 0 and 2' 
+        });
+        return;
+      }
+    }
+
+    console.log('📝 Request received:', {
+      prompt: prompt.substring(0, 100) + (prompt.length > 100 ? '...' : ''),
+      model: model || 'default',
+      temperature: temperature || 'default'
+    });
+
     const vertexService = new VertexAIService();
-    const result = await vertexService.generateResponse({ prompt });
+    const result = await vertexService.generateResponse({ 
+      prompt, 
+      model, 
+      temperature 
+    });
 
     if (result.error) {
       console.error('Vertex AI Error:', result.error);
