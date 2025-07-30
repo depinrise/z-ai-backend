@@ -18,7 +18,7 @@ export class VertexAIService {
   constructor() {
     this.projectId = process.env.GCP_PROJECT_ID || '';
     this.location = process.env.GCP_LOCATION || 'us-central1';
-    this.modelId = process.env.GCP_MODEL_ID || 'gemini-2.5-flash';
+    this.modelId = process.env.GCP_MODEL_ID || 'gemini-1.5-flash';
 
     if (!this.projectId) {
       throw new Error('GCP_PROJECT_ID environment variable is required');
