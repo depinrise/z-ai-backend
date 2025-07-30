@@ -18,7 +18,7 @@ export class VertexAIService {
   constructor() {
     this.projectId = process.env.GCP_PROJECT_ID || '';
     this.location = process.env.GCP_LOCATION || 'us-central1';
-    this.modelId = process.env.GCP_MODEL_ID || 'gemini-pro';
+    this.modelId = process.env.GCP_MODEL_ID || 'gemini-1.5-flash';
 
     if (!this.projectId) {
       throw new Error('GCP_PROJECT_ID environment variable is required');
@@ -107,17 +107,21 @@ export class VertexAIService {
 
   async generateResponse(request: ChatRequest): Promise<ChatResponse> {
     try {
-      // Use Vertex AI REST API directly
-      const url = `https://${this.location}-aiplatform.googleapis.com/v1/projects/${this.projectId}/locations/${this.location}/publishers/google/models/${this.modelId}:predict`;
+      // Use Vertex AI Generative AI API for Gemini models
+      const url = `https://${this.location}-aiplatform.googleapis.com/v1/projects/${this.projectId}/locations/${this.location}/publishers/google/models/${this.modelId}:generateContent`;
       
       const requestBody = {
-        instances: [
+        contents: [
           {
-            prompt: request.prompt
+            parts: [
+              {
+                text: request.prompt
+              }
+            ]
           }
         ],
-        parameters: {
-          temperature: 0.7,
+        generationConfig: {
+          temperature: 1.5,
           maxOutputTokens: 1024,
           topP: 0.8,
           topK: 40,
@@ -143,15 +147,15 @@ export class VertexAIService {
 
       const data = await response.json();
       
-      if (!data.predictions || data.predictions.length === 0) {
-        throw new Error('No predictions returned from Vertex AI');
+      if (!data.candidates || data.candidates.length === 0) {
+        throw new Error('No candidates returned from Vertex AI');
       }
 
-      const prediction = data.predictions[0];
+      const candidate = data.candidates[0];
       let responseText = '';
 
-      // Extract text from prediction
-      responseText = this.extractTextFromPrediction(prediction);
+      // Extract text from candidate
+      responseText = this.extractTextFromCandidate(candidate);
 
       if (!responseText) {
         throw new Error('Unable to extract response text from Vertex AI response');
@@ -170,65 +174,36 @@ export class VertexAIService {
     }
   }
 
-  private extractTextFromPrediction(prediction: any): string {
+  private extractTextFromCandidate(candidate: any): string {
     try {
-      // Handle different prediction formats
-      if (typeof prediction === 'string') {
-        return prediction;
-      }
-
-      if (prediction.structValue && prediction.structValue.fields) {
-        // Try to extract from structured response
-        const fields = prediction.structValue.fields;
-        
-        // Check for candidates
-        if (fields.candidates && fields.candidates.listValue) {
-          const candidates = fields.candidates.listValue.values;
-          if (candidates && candidates.length > 0) {
-            const firstCandidate = candidates[0];
-            if (firstCandidate.structValue && firstCandidate.structValue.fields) {
-              const content = firstCandidate.structValue.fields.content;
-              if (content && content.structValue && content.structValue.fields) {
-                const parts = content.structValue.fields.parts;
-                if (parts && parts.listValue && parts.listValue.values) {
-                  const firstPart = parts.listValue.values[0];
-                  if (firstPart.structValue && firstPart.structValue.fields) {
-                    const text = firstPart.structValue.fields.text;
-                    if (text && text.stringValue) {
-                      return text.stringValue;
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        // Check for direct text field
-        if (fields.text && fields.text.stringValue) {
-          return fields.text.stringValue;
-        }
-
-        // Check for content field
-        if (fields.content && fields.content.structValue) {
-          const contentFields = fields.content.structValue.fields;
-          if (contentFields && contentFields.text && contentFields.text.stringValue) {
-            return contentFields.text.stringValue;
-          }
+      // Handle Gemini Generative AI API response format
+      if (candidate.content && candidate.content.parts) {
+        const parts = candidate.content.parts;
+        if (parts.length > 0 && parts[0].text) {
+          return parts[0].text;
         }
       }
 
-      // If it's a list value
-      if (prediction.listValue && prediction.listValue.values) {
-        const values = prediction.listValue.values;
-        if (values.length > 0) {
-          return this.extractTextFromPrediction(values[0]);
+      // Fallback: try to extract from different possible structures
+      if (candidate.text) {
+        return candidate.text;
+      }
+
+      if (candidate.parts && candidate.parts.length > 0) {
+        const firstPart = candidate.parts[0];
+        if (firstPart.text) {
+          return firstPart.text;
         }
+      }
+
+      // If it's a string
+      if (typeof candidate === 'string') {
+        return candidate;
       }
 
       return '';
     } catch (error) {
-      console.error('Error extracting text from prediction:', error);
+      console.error('Error extracting text from candidate:', error);
       return '';
     }
   }
