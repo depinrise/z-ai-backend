@@ -121,7 +121,7 @@ export class VertexAIService {
             role: "user",
             parts: [
               {
-                text: request.prompt
+                text: `Kamu adalah Z AI, asisten AI yang ramah dan membantu. Kamu tidak perlu menyebutkan bahwa kamu adalah model Google atau AI lainnya. Kamu cukup menjadi Z AI yang natural dan friendly. Sekarang, tolong jawab pertanyaan ini: ${request.prompt}`
               }
             ]
           }
